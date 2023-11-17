@@ -1,0 +1,356 @@
+# Instale o pacote se ainda não estiver instalado
+# install.packages("survival")
+
+# Carregue o pacote
+library(survival)
+pacman::p_load(ggsci, gridExtra)
+
+# Defina um conjunto de dados de sobrevida fictício
+set.seed(123)
+n <- 100
+time <- round(rexp(n, rate = 0.1), 1)  # Dados de sobrevida exponencial
+status <- sample(0:1, n, replace = TRUE)  # Variável indicadora de evento
+
+# Crie um objeto de dados de sobrevida
+surv_data <- data.frame(time = time, status = status)
+
+head(surv_data, 10)
+
+
+# Calcule as estimativas de Kaplan-Meier
+km_fit <- survfit(Surv(time, status) ~ 1, data = surv_data)
+summary(km_fit)
+
+
+# Calcule a função de hazard
+hazard_fit <- -diff(log(km_fit$surv))
+summary(hazard_fit)
+
+
+# Crie um gráfico comparativo
+par(mfrow = c(1, 2))  # Subplots lado a lado
+
+# Gráfico da estimativa de Kaplan-Meier
+plot(km_fit, main = "Kaplan-Meier", xlab = "Tempo", ylab = "Probabilidade de sobrevivência")
+
+# Gráfico da função de hazard
+plot(hazard_fit, main = "Função de Hazard", xlab = "Tempo", ylab = "Taxa de Hazard")
+
+# Volte para uma única janela gráfica
+par(mfrow = c(1, 1))
+
+
+Bibliotecas
+library(survival)
+library(survminer)
+#library(scales)
+library(Publish)
+
+# Definindo pasta de trabalho
+setwd("C:/0_EPI_Cancer/Aula1")
+
+# carregando os dados
+dados=read.csv2("Exemplo_Leucemia.csv")
+# Descricao da Amostra
+nrow(dados)
+summary(dados$Tempo)
+table(dados$Evento)
+
+################################################################################
+# Tempo de seguimento
+dados$censura=ifelse(dados$Evento==0,1,0)
+m0=survfit(Surv(Tempo,censura) ~ 1, data=dados)
+m0
+
+################################################################################
+# Sobrevivencia
+
+m0=survfit(Surv(Tempo,Evento) ~ 1, data=dados)
+m0
+summary(m0,extend=TRUE,times=c(1:5)) 
+png(file="Leucemia_todos.png", width=21, height=19, units="cm", res=300)
+ggsurvplot(m0, data=dados,title="Curva de Sobrevivência", )
+dev.off()
+
+################################################################################
+# Leuini
+table(dados$LeuniniBi)
+round(prop.table(table(dados$LeuniniBi))*100,2)
+
+# Tempo de seguimento
+m0=survfit(Surv(Tempo,censura) ~ LeuniniBi, data=dados)
+m0
+
+# Curva de Sobrevivencia
+m0=survfit(Surv(Tempo,Evento) ~ LeuniniBi, data=dados)
+summary(m0,extend=TRUE,times=c(1:5)) 
+survdiff(Surv(Tempo,Evento)~ LeuniniBi,data=dados)
+png(file="Leucemia_Leuini.png", width=21, height=19, units="cm", res=300)
+ggsurvplot(m0, data=dados,
+           fontsize=5,
+           pval=TRUE,
+           title="Curva de Sobrevivência", 
+           conf.int=F, 
+           surv.median.line = "h",
+           legend.fontsize=5,
+           legend.title="Leuini",
+           legend.labs=c("<75.000",">=75.000"))
+dev.off()
+
+# Modelo de Cox
+fit1 <- coxph(Surv(Tempo, Evento) ~ factor(LeuniniBi),
+              data=dados, method="breslow", x=T)
+summary(fit1)
+
+################################################################################
+# Peso
+table(dados$PesoBi)
+round(prop.table(table(dados$PesoBi))*100,2)
+
+# Tempo de seguimento
+m0=survfit(Surv(Tempo,censura) ~ PesoBi, data=dados)
+m0
+
+# Curva de Sobrevivencia
+m0=survfit(Surv(Tempo,Evento) ~ PesoBi, data=dados)
+summary(m0,extend=TRUE,times=c(1:5)) 
+survdiff(Surv(Tempo,Evento)~ PesoBi,data=dados)
+png(file="Leucemia_Peso.png", width=21, height=19, units="cm", res=300)
+ggsurvplot(m0, data=dados,
+           fontsize=5,
+           pval=TRUE,
+           title="Curva de Sobrevivência", 
+           conf.int=F, 
+           surv.median.line = "h",
+           legend.fontsize=5,
+           legend.title="Peso",
+           legend.labs=c("<=-2dp",">2dp"))
+dev.off()
+
+# Modelo de Cox
+fit1 <- coxph(Surv(Tempo, Evento) ~ factor(PesoBi),
+              data=dados, method="breslow", x=T)
+summary(fit1)
+
+
+
+
+
+
+
+
+
+
+
+
+
+############################################################
+# Covariável Idade
+summary(dados$Idade)
+hist(dados$Idade,main="Idade")
+dados$idade_cat=ifelse(dados$Idade<=48.53,1,
+                       ifelse(dados$Idade<=70.28,2,
+                              ifelse(dados$Idade<=94.83,3,4)))
+table(dados$idade_cat)
+
+# Modelo de Cox
+fit2 <- coxph(Surv(Tempo, Evento) ~ factor(idade_cat),
+              data=dados, method="breslow", x=T)
+summary(fit2)
+
+#recategorizando Idade
+dados$idade_cat2=factor(dados$idade_cat,levels=c(3,1,2,4))
+fit3 <- coxph(Surv(Tempo, Evento) ~ factor(idade_cat2),
+              data=dados, method="breslow", x=T)
+summary(fit3)
+
+#utilizando Idade como COVARIAVEL
+fit4 <- coxph(Surv(Tempo, Evento) ~ Idade,
+              data=dados, method="breslow", x=T)
+summary(fit4)
+
+# Interacao idade e leuini
+# Modelo de Cox
+table(dados$idade_cat,dados$LeuniniBi)
+fit5 <- coxph(Surv(Tempo, Evento) ~ factor(idade_cat) +
+                factor(LeuniniBi) +
+                factor(idade_cat)*factor(LeuniniBi),
+              data=dados, method="breslow", x=T)
+summary(fit5)
+publish(fit5)
+
+
+################################################################################
+
+# Instale os pacotes se ainda não estiverem instalados
+# install.packages(c("survival", "ggplot2"))
+
+# Carregue os pacotes
+library(survival)
+library(ggplot2)
+
+# Instale os pacotes se ainda não estiverem instalados
+# install.packages(c("survival", "ggplot2"))
+
+# Carregue os pacotes
+library(survival)
+library(ggplot2)
+
+# Crie dados fictícios de sobrevida
+set.seed(123)
+n <- 100
+time <- rexp(n, rate = 0.1)
+status <- sample(0:1, n, replace = TRUE)
+surv_data <- data.frame(time = time, status = status)
+
+# Ajuste o modelo de Kaplan-Meier
+km_fit <- survfit(Surv(time, status) ~ 1, data = surv_data)
+
+# Converta o objeto survfit para data.frame
+km_df <- data.frame(time = km_fit$time, surv = km_fit$surv, strata = rep(1, length(km_fit$time)))
+
+# Crie um gráfico de Kaplan-Meier com ggplot2
+a <- ggplot(km_df, aes(x = time, y = surv, color = factor(strata))) +
+  geom_step(size = 1.5) +
+  labs(title = "Curva de Kaplan-Meier",
+       x = "Tempo",
+       y = "Probabilidade de Sobrevivência",
+       color = "Grupo") +
+  theme_minimal() +
+  theme(legend.position = "bottom", legend.title = element_text(face = "italic")) +
+  scale_color_manual(values = c("red", "blue")) +
+  guides(color = guide_legend(nrow = 2)) +
+  annotate("text", x = 50, y = 0.5, label = "Mediana", vjust = -1, hjust = -1, color = "black", size = 3) +
+  geom_vline(xintercept = 50, linetype = "dashed", color = "black", size = 1) +
+  theme(axis.title = element_text(face = "bold"),
+        axis.text = element_text(size = 10),
+        axis.title.y = element_text(margin = margin(r = 10)),
+        plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 12))
+
+a_nejm <- a + scale_color_lancet() +
+  scale_fill_lancet()
+
+a_nejm + theme(
+  text = element_text(family = "AppleGothic")
+)
+
+
+########
+
+
+
+
+```{r structure of dataset}
+skimr::skim(dt)
+```
+
+
+```{r variable names}
+names(dt)
+```
+
+
+```{r formatting variable names}
+dt <- dt |> 
+  clean_names()
+
+names(dt)
+```
+
+
+```{r checking non disclosed columns}
+
+dt |> 
+  select(column1, column2, everything()) |> 
+  names() 
+```
+
+
+```{r selecting only numerical variables and contents and duplicates}
+
+dt |> 
+  select(where(is.numeric)) |> 
+  names()
+
+dt |> 
+  select(contains("XXXX")) |> 
+  names()
+
+dt |> 
+  select(matches("XXX|YYY|ZZZ")) |> 
+  names()
+
+dt |> 
+  select(any_of(c("XXX", "YYY", "ZZZ"))) |> 
+  names()
+
+dt_dup <- dt |> 
+  distinct()
+```
+
+
+```{r recoding values}
+
+dt <- dt |> 
+  mutate(var1 = recode(
+    var1, "old" = "new"
+  ))
+
+dt <- dt |> 
+  mutate(
+    var1, var2 == "X", "Ipsum"
+  )
+
+dt <- dt |> 
+  mutate(var1 = ifelse(
+    !is.na(XXX), 
+    "True", 
+    "False"))
+
+```
+
+
+```{r categorization}
+
+dt <- dt |> 
+  mutate(new_column = case_when(
+    var1 == "XXX" ~ var2,
+    var1 == "YYY" ~ var2/n,
+    is.na(var1)   ~ var2
+  ))
+```
+
+
+```{r dataset long - pivoting} 
+
+dt_long <- dt |> 
+  pivot_longer(
+    cols = c('AAA', 'BBB', 'CCC')
+  )
+
+dt |> 
+  pivot_longer(
+    cols = starts_with("XXX_")
+  )
+
+dt |> 
+  pivot_longer(
+    cols = starts_with("XXX_"),
+    names_to = "nome que vc quer",
+    values_to = "unidades..."
+  )
+```
+
+```{r missing}
+gg_miss_var(dt, var1 = TRUE)
+
+
+ggplot(
+  data = dt,
+  mapping = aes(x = var1, y = var2)) +     
+  geom_miss_point()
+```
+
+
